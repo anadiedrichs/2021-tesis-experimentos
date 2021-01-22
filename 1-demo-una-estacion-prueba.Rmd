@@ -1,0 +1,66 @@
+---
+title: "1-demo-una-estacion-prueba"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## librerias a utilizar
+
+```{r}
+library(tidymodels)
+```
+```{r}
+library(keras)
+```
+## Load raw dataset
+
+```{r}
+library(readr)
+dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
+    col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
+View(dacc_daily_tmin)
+```
+
+## Create dataset for one station
+
+Solo tomaré la estación de Junín
+
+```{r}
+junin <- dacc_daily_tmin %>% 
+  select(starts_with("junin")) %>% 
+  rename_with( ~ tolower(gsub("junin.", "", .x, fixed = TRUE))) # quita el junin. de los nombres de las columnas
+```
+
+Quiero predecir la temperatura mínima, si es o no es helada.
+
+```{r}
+tmin <- junin %>% 
+  select(temp_min) 
+
+colnames(tmin) <- "tmin"
+
+
+```
+
+```{r}
+tmin_helada <- tmin
+
+tmin_helada <- tmin_helada %>% mutate(tmin = case_when(
+  tmin <= 0 ~ as.character("helada"),
+  TRUE ~ as.character("no-helada")
+))
+```
+
+Creo el dataset desfazado en un día a predecir
+
+```{r}
+data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
+```
+
+```{r}
+data_clasificacion <- cbind(junin[1:(nrow(junin)-1),],tmin_helada[2:nrow(tmin_helada),])
+```
+
