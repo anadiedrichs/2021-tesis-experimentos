@@ -10,11 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ## librerias a utilizar
 
 ```{r}
-library(tidymodels)
-```
-```{r}
+library(tidymodels) # para machine learning
+
+# para redes neuronales
 library(keras)
+# para random forest
+library(ranger)
+
 ```
+
 ## Load raw dataset
 
 ```{r}
@@ -63,4 +67,25 @@ data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
 ```{r}
 data_clasificacion <- cbind(junin[1:(nrow(junin)-1),],tmin_helada[2:nrow(tmin_helada),])
 ```
+
+## Explorar el dataset 
+
+```{r}
+library(DataExplorer)
+DataExplorer::plot_boxplot(data_clasificacion, by="tmin")
+```
+Notamos que trabajamos con un dataset desbalancedo 
+
+
+```{r}
+table(data_clasificacion$tmin)
+```
+
+## Modelo random forest Junín solo para predecir helada o no_helada
+
+
+
+## Modelo random forest Junin con las otras estaciones para predecir helada
+
+
 
