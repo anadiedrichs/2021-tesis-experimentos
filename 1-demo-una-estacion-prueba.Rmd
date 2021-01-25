@@ -114,8 +114,7 @@ base_recipe <- training(base_split) %>%
   recipe(tmin ~.) %>%
   step_corr(all_numeric()) %>%
   step_normalize(all_numeric(), -all_outcomes())  %>%
-  step_smote(tmin) %>%
-  prep()
+  step_smote(tmin) 
 
 base_recipe
 ```
@@ -164,8 +163,6 @@ wf <- workflow() %>%
 wf 
 ```
 
-this chunk throws an error
-TODO fix 
 
 ```{r }
 #utilizamos la funcion last_fit junto al workflow y al split de datos
@@ -176,11 +173,93 @@ final_fit %>%
   collect_metrics()
 ```
 
+```{r}
+final_fit$.predictions[[1]] %>% recall(truth= tmin, .pred_class) 
+```
 
 
-TODO pr_curve
-TODO roc curve
-TODO conf_mat
+### pr_curve
+
+```{r}
+final_fit$.predictions[[1]]
+```
+
+```{r}
+final_fit$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) %>% autoplot()
+```
+
+
+### roc curve
+
+```{r}
+final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% autoplot()
+```
+Con ggplot 
+
+```{r}
+library(ggplot2)
+library(dplyr)
+final_fit$.predictions[[1]] %>% 
+  roc_curve(truth=tmin,.pred_helada) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity)) +
+  geom_path() +
+  geom_abline(lty = 3) +
+  coord_equal() +
+  theme_bw()
+```
+
+
+### conf_mat
+
+```{r}
+model_rf <- wf %>% fit(data=base_train)
+
+
+#model_rf <- wf %>% fit_resamples(resamples = base_folds)
+```
+
+```{r}
+model_rf %>% pull_workflow_fit()
+```
+
+```{r}
+model_rf %>% 
+  predict( new_data = base_testing) %>% 
+  bind_cols(base_testing["tmin"]) %>% 
+  precision(truth= as.factor(tmin), .pred_class) 
+
+```
+
+```{r}
+model_rf %>% 
+  predict( new_data = base_testing) %>% 
+  bind_cols(base_testing["tmin"]) %>% 
+  bal_accuracy(truth= as.factor(tmin), .pred_class) 
+
+```
+
+```{r}
+model_rf %>% 
+  predict( new_data = base_testing) %>% 
+  bind_cols(base_testing["tmin"]) %>% 
+  recall(truth= as.factor(tmin), .pred_class) 
+
+```
+
+
+```{r}
+model_rf %>% 
+  predict( new_data = base_testing) %>% 
+  bind_cols(base_testing["tmin"]) %>% 
+  kap(truth= as.factor(tmin), .pred_class) 
+
+```
+```{r}
+
+model_rf_cv <- wf %>% fit_resamples(resamples = base_folds)
+```
+
+
 
 ## Modelo random forest Junin con las otras estaciones para predecir helada
 
