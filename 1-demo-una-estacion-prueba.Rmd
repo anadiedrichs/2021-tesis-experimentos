@@ -11,12 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(tidymodels) # para machine learning
-
-# para redes neuronales
-library(keras)
-# para random forest
-library(ranger)
-
+library(keras) # para redes neuronales
+library(ranger) # para random forest
+library(themis) # SMOTE, ROSE etc
+library(DataExplorer)
 ```
 
 ## Load raw dataset
@@ -25,7 +23,7 @@ library(ranger)
 library(readr)
 dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
     col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
-View(dacc_daily_tmin)
+#View(dacc_daily_tmin)
 ```
 
 ## Create dataset for one station
@@ -53,8 +51,8 @@ colnames(tmin) <- "tmin"
 tmin_helada <- tmin
 
 tmin_helada <- tmin_helada %>% mutate(tmin = case_when(
-  tmin <= 0 ~ as.character("helada"),
-  TRUE ~ as.character("no-helada")
+  tmin <= 0 ~ as.character("helada"),  # frost event
+  TRUE ~ as.character("no-helada")   # no frost
 ))
 ```
 
@@ -68,24 +66,122 @@ data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
 data_clasificacion <- cbind(junin[1:(nrow(junin)-1),],tmin_helada[2:nrow(tmin_helada),])
 ```
 
+Convierto a factor la columna tmin
+
+```{r}
+data_clasificacion$tmin <- as.factor(data_clasificacion$tmin)
+```
+
 ## Explorar el dataset 
 
 ```{r}
-library(DataExplorer)
+
 DataExplorer::plot_boxplot(data_clasificacion, by="tmin")
 ```
-Notamos que trabajamos con un dataset desbalancedo 
+Notamos que trabajamos con un dataset desbalanceado 
 
 
 ```{r}
 table(data_clasificacion$tmin)
 ```
 
+## Configuración entranamiento
+
+```{r}
+set.seed(4848) #setear la semilla
+base_split <- data_clasificacion %>%
+          initial_split(prop=0.75) # divido en 75%
+
+# to extract the training and testing datasets 
+base_train <- training(base_split)
+base_testing <- testing(base_split)
+
+base_split
+
+# para hacer validación cruzada estratificada
+base_folds <- vfold_cv(base_train, strata = tmin) 
+```
+
+Vamos a entrenar con 4138 muestras, validar con 1379 y en total son 5517 muestras.
+
+Especifico ahora la receta para el entrenamiento.
+
+```{r}
+# receta
+set.seed(4848) #setear la semilla
+
+base_recipe <- training(base_split) %>%
+  recipe(tmin ~.) %>%
+  step_corr(all_numeric()) %>%
+  step_normalize(all_numeric(), -all_outcomes())  %>%
+  step_smote(tmin) %>%
+  prep()
+
+base_recipe
+```
+
 ## Modelo random forest Junín solo para predecir helada o no_helada
 
+```{r}
+# modelo
+base_rf_spec <- rand_forest() %>% 
+  set_engine("ranger") %>% 
+  set_mode("classification")
 
+```
+
+
+TODO how to add other metrics such as sens spec precision ? 
+
+```{r}
+#random forest fit 
+set.seed(4848)
+
+base_rf_model <- base_rf_spec %>% 
+  fit_resamples(tmin ~ ., 
+                resamples = base_folds)
+
+```
+
+```{r}
+base_rf_model %>% collect_metrics() 
+
+```
+
+
+```{r}
+show_best(base_rf_model, metric = "accuracy")
+```
+
+
+
+## Error Resample1
+```{r}
+#armo el workflow
+wf <- workflow() %>%
+  add_recipe(base_recipe) %>% #agrego la receta
+  add_model(base_rf_spec) #agrego el modelo
+wf 
+```
+
+this chunk throws an error
+TODO fix 
+
+```{r }
+#utilizamos la funcion last_fit junto al workflow y al split de datos
+final_fit <- last_fit(wf,split = base_split)
+
+
+final_fit %>%
+  collect_metrics()
+```
+
+
+
+TODO pr_curve
+TODO roc curve
+TODO conf_mat
 
 ## Modelo random forest Junin con las otras estaciones para predecir helada
-
 
 
