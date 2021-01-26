@@ -85,7 +85,7 @@ Notamos que trabajamos con un dataset desbalanceado
 table(data_clasificacion$tmin)
 ```
 
-## Configuración entranamiento
+## Configuración entrenamiento
 
 ```{r}
 set.seed(4848) #setear la semilla
@@ -130,8 +130,6 @@ base_rf_spec <- rand_forest() %>%
 ```
 
 
-TODO how to add other metrics such as sens spec precision ? 
-
 ```{r}
 #random forest fit 
 set.seed(4848)
@@ -154,7 +152,7 @@ show_best(base_rf_model, metric = "accuracy")
 
 
 
-## Error Resample1
+## Predicción en test-set
 ```{r}
 #armo el workflow
 wf <- workflow() %>%
@@ -177,8 +175,18 @@ final_fit %>%
 final_fit$.predictions[[1]] %>% recall(truth= tmin, .pred_class) 
 ```
 
+```{r}
+final_fit$.predictions[[1]] %>% precision(truth= tmin, .pred_class) 
+```
 
 ### pr_curve
+
+```{r}
+final_fit$splits[[1]]
+```
+```{r}
+final_fit$.predictions[[1]] %>% nrow()
+```
 
 ```{r}
 final_fit$.predictions[[1]]
@@ -254,13 +262,195 @@ model_rf %>%
   kap(truth= as.factor(tmin), .pred_class) 
 
 ```
-```{r}
 
-model_rf_cv <- wf %>% fit_resamples(resamples = base_folds)
+
+## Modelo random forest Junin con las otras estaciones para predecir helada
+
+
+### Dataset 
+
+Solo tomaré la estación de Junín y Tunuyan
+
+```{r}
+junin_tunuyan <- dacc_daily_tmin %>% 
+  select(starts_with("junin") | starts_with("tunuyan") ) #%>% 
+  #rename_with( ~ tolower(gsub("junin.", "", .x, fixed = TRUE))) # quita el junin. de los nombres de las columnas
+```
+
+Quiero predecir la temperatura mínima, si es o no es helada.
+
+```{r}
+tmin <- junin_tunuyan %>% 
+  select(junin.temp_min) 
+
+colnames(tmin) <- "tmin"
+
+
+```
+
+```{r}
+tmin_helada <- tmin
+
+tmin_helada <- tmin_helada %>% mutate(tmin = case_when(
+  tmin <= 0 ~ as.character("helada"),  # frost event
+  TRUE ~ as.character("no-helada")   # no frost
+))
+```
+
+Creo el dataset desfazado en un día a predecir
+
+```{r}
+data_tmin_junin_tunu <- cbind(junin_tunuyan[1:(nrow(junin_tunuyan)-1),],tmin[2:nrow(tmin),])
+```
+
+```{r}
+data_clasificacion_junin_tunu <- cbind(junin_tunuyan[1:(nrow(junin_tunuyan)-1),],tmin_helada[2:nrow(tmin_helada),])
+```
+
+Convierto a factor la columna tmin
+
+```{r}
+data_clasificacion_junin_tunu$tmin <- as.factor(data_clasificacion_junin_tunu$tmin)
+```
+
+### Configuración entrenamiento 
+
+```{r}
+set.seed(4848) #setear la semilla
+base_split_jt <- data_clasificacion_junin_tunu %>%
+          initial_split(prop=0.75) # divido en 75%
+
+# to extract the training and testing datasets 
+base_train_jt <- training(base_split_jt)
+base_testing_jt <- testing(base_split_jt)
+
+base_split_jt
+
+# para hacer validación cruzada estratificada
+base_folds_jt <- vfold_cv(base_train_jt, strata = tmin) 
+```
+
+Vamos a usar la misma receta y modelo que para entrenar sólo a Junin
+
+```{r}
+# receta
+set.seed(4848) #setear la semilla
+
+base_recipe_jt <- training(base_split_jt) %>%
+  recipe(tmin ~.) %>%
+  step_corr(all_numeric()) %>%
+  step_normalize(all_numeric(), -all_outcomes())  %>%
+  step_smote(tmin) 
+base_recipe
+```
+Cross-validation fit
+
+```{r}
+#random forest fit 
+set.seed(123)
+
+base_rf_model_jt <- base_rf_spec %>% 
+  fit_resamples(tmin ~ ., 
+                resamples = base_folds_jt)
+
+```
+
+```{r}
+base_rf_model_jt %>% collect_metrics() 
+
 ```
 
 
 
-## Modelo random forest Junin con las otras estaciones para predecir helada
+### Predicción en test-set
+
+
+```{r}
+#armo el workflow
+wf_jt <- workflow() %>%
+  add_recipe(base_recipe_jt) %>% #agrego la receta
+  add_model(base_rf_spec) #agrego el modelo
+wf_jt 
+```
+
+
+```{r }
+#utilizamos la funcion last_fit junto al workflow y al split de datos
+final_fit_jt <- last_fit(wf_jt,split = base_split_jt)
+
+
+final_fit_jt %>%
+  collect_metrics()
+```
+
+```{r}
+final_fit$.predictions[[1]] %>% select(.pred_class,tmin ) %>% table()
+```
+
+```{r}
+final_fit_jt$.predictions[[1]] %>% select(.pred_class,tmin ) %>% table()
+```
+
+```{r}
+final_fit_jt$.predictions[[1]] %>% recall(truth= tmin, .pred_class) 
+```
+
+
+
+```{r}
+final_fit_jt$.predictions[[1]] %>% precision(truth= tmin, .pred_class) 
+```
+### pr curve
+
+```{r}
+final_fit_jt$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) %>% autoplot()
+```
+
+
+### roc curve
+
+```{r}
+final_fit_jt$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% autoplot()
+```
+
+### unir dos curvas roc o dos curvas pr
+
+#### pr curve 
+
+```{r}
+tablita <- final_fit_jt$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) %>% add_column(model="Junin+Tunuyan")
+```
+
+```{r}
+final_fit$.predictions[[1]] %>% 
+  pr_curve(truth=tmin,.pred_helada) %>% 
+  add_column(model="Junin") %>% 
+  bind_rows(tablita) %>% 
+  ggplot(aes(x=recall,y=precision,color=model)) +
+  geom_line()
+```
+
+#### roc curve 
+```{r}
+
+final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada)
+```
+
+```{r}
+tt <- final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% add_column(model = "Junin")
+```
+
+```{r}
+final_fit_jt$.predictions[[1]] %>% 
+  roc_curve(truth=tmin,.pred_helada)  %>% 
+  add_column(model="Junin+Tunuyan") %>% 
+  bind_rows(tt) %>% 
+  ggplot(aes(x=(1-specificity),y=sensitivity,color=model)) +
+  geom_line()
+```
+
+
+
+
 
 
