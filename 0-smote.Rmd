@@ -1,0 +1,222 @@
+---
+title: "SMOTE vs base"
+author: "Ana Laura Diedrichs"
+date: "28/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## librerias a utilizar
+
+```{r  message=FALSE}
+library(tidymodels) # para machine learning
+library(ranger) # para random forest
+library(themis) # SMOTE, ROSE etc
+library(DataExplorer)
+```
+
+## Load raw dataset
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
+    col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
+#View(dacc_daily_tmin)
+```
+
+## Nombres de las estaciones meteorológicas 
+
+```{r}
+estaciones <- c("junin","tunuyan","agua_amarga","las_paredes","la_llave")
+```
+
+
+## Función que genera el dataset para clasificación
+
+
+```{r}
+
+get_dataset_for_classification <- function(station_name)
+{
+  
+  if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
+
+  junin <- dacc_daily_tmin %>% 
+  select(starts_with(station_name)) %>% 
+  rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
+  # quita el junin. de los nombres de las columnas
+
+# Quiero predecir la temperatura mínima, si es o no es helada.
+
+  tmin <- junin %>% 
+    select(temp_min) 
+  
+  colnames(tmin) <- "tmin"
+  
+  
+  tmin_helada <- tmin
+  
+  tmin_helada <- tmin_helada %>% mutate(tmin = case_when(
+    tmin <= 0 ~ as.character("helada"),  # frost event
+    TRUE ~ as.character("no-helada")   # no frost
+  ))
+  
+  # para regresion
+  # data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
+  
+  data_clasificacion <- cbind(junin[1:(nrow(junin)-1),],tmin_helada[2:nrow(tmin_helada),])
+  
+  #Convierto a factor la columna tmin
+  
+  data_clasificacion$tmin <- as.factor(data_clasificacion$tmin)
+  
+  return(data_clasificacion)
+}
+
+
+
+```
+
+```{r}
+get_dataset_for_classification("tunuyan") %>% head()
+
+```
+
+## Obtener dataset para clasificación 
+
+```{r}
+
+data_clasificacion <- get_dataset_for_classification("las_paredes")
+```
+
+## clasificador sin SMOTE 
+
+### Configuración entrenamiento
+
+```{r}
+# split in trainint and testing sets
+data_split <- function(dataset,prop = 0.75) {
+
+    
+}
+```
+
+```{r}
+set.seed(4848) #setear la semilla
+base_split <- data_clasificacion %>%
+          initial_split(prop=0.75) # divido en 75%
+
+# to extract the training and testing datasets 
+#base_train <- training(base_split)
+#base_testing <- testing(base_split)
+
+base_split
+
+# para hacer validación cruzada estratificada
+base_folds <- vfold_cv(training(base_split), strata = tmin) 
+```
+
+Vamos a entrenar con 4138 muestras, validar con 1379 y en total son 5517 muestras.
+
+Especifico ahora la receta para el entrenamiento.
+
+```{r}
+# receta
+set.seed(4848) #setear la semilla
+
+base_recipe <- training(base_split) %>%
+  recipe(tmin ~.) %>%
+  step_corr(all_numeric()) %>%
+  step_normalize(all_numeric(), -all_outcomes()) 
+#%>% 
+#  step_smote(tmin)
+
+base_recipe
+```
+
+### Modelo random forest Junín solo para predecir helada o no_helada
+
+```{r}
+# modelo
+base_rf_spec <- rand_forest() %>% 
+  set_engine("ranger") %>% 
+  set_mode("classification")
+
+```
+
+
+```{r}
+#random forest fit 
+set.seed(4848)
+
+base_rf_model <- base_rf_spec %>% 
+  fit_resamples(tmin ~ ., 
+                resamples = base_folds)
+
+```
+
+```{r}
+base_rf_model %>% collect_metrics() 
+
+```
+
+
+```{r}
+show_best(base_rf_model, metric = "accuracy")
+```
+
+
+
+### Predicción en test-set
+```{r}
+#armo el workflow
+wf <- workflow() %>%
+  add_recipe(base_recipe) %>% #agrego la receta
+  add_model(base_rf_spec) #agrego el modelo
+wf 
+```
+
+
+```{r }
+#utilizamos la funcion last_fit junto al workflow y al split de datos
+final_fit <- last_fit(wf,split = base_split)
+
+
+final_fit %>%
+  collect_metrics()
+```
+
+```{r}
+final_fit$.predictions[[1]] %>% recall(truth= tmin, .pred_class) 
+```
+
+```{r}
+final_fit$.predictions[[1]] %>% precision(truth= tmin, .pred_class) 
+```
+
+### pr_curve
+
+```{r}
+final_fit$splits[[1]]
+```
+```{r}
+final_fit$.predictions[[1]] %>% nrow()
+```
+
+```{r}
+final_fit$.predictions[[1]]
+```
+
+```{r}
+final_fit$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) %>% autoplot()
+```
+
+
+### roc curve
+
+```{r}
+final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% autoplot()
+```
