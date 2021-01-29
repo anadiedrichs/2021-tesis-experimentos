@@ -1,5 +1,6 @@
 ---
 title: "1-demo-una-estacion-prueba"
+author: "Ana Laura Diedrichs"
 output: html_document
 ---
 
@@ -113,8 +114,8 @@ set.seed(4848) #setear la semilla
 base_recipe <- training(base_split) %>%
   recipe(tmin ~.) %>%
   step_corr(all_numeric()) %>%
-  step_normalize(all_numeric(), -all_outcomes())  %>%
-  step_smote(tmin) 
+  step_normalize(all_numeric(), -all_outcomes())  #%>%
+#  step_smote(tmin) 
 
 base_recipe
 ```
