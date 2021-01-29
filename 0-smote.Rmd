@@ -88,8 +88,8 @@ get_dataset_for_classification("tunuyan") %>% head()
 ## Obtener dataset para clasificación 
 
 ```{r}
-
-data_clasificacion <- get_dataset_for_classification("las_paredes")
+estacion <- "la_llave"
+data_clasificacion <- get_dataset_for_classification(estacion)
 ```
 
 ## clasificador sin SMOTE 
@@ -100,14 +100,16 @@ data_clasificacion <- get_dataset_for_classification("las_paredes")
 # split in trainint and testing sets
 data_split <- function(dataset,prop = 0.75) {
 
-    
+    base_split <- dataset %>%
+          initial_split(prop=prop) # divido en prop %
+    return(base_split)
 }
 ```
 
 ```{r}
 set.seed(4848) #setear la semilla
-base_split <- data_clasificacion %>%
-          initial_split(prop=0.75) # divido en 75%
+
+base_split <- data_split(data_clasificacion) 
 
 # to extract the training and testing datasets 
 #base_train <- training(base_split)
@@ -122,6 +124,33 @@ base_folds <- vfold_cv(training(base_split), strata = tmin)
 Vamos a entrenar con 4138 muestras, validar con 1379 y en total son 5517 muestras.
 
 Especifico ahora la receta para el entrenamiento.
+
+```{r}
+receta_smote <- function(un_split){
+  
+  base_recipe <- training(un_split) %>%
+  recipe(tmin ~.) %>%
+  step_corr(all_numeric()) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>% 
+  step_smote(tmin)
+  
+  
+  base_recipe
+}
+
+
+
+receta_sin_smote <- function(un_split) {
+  
+  base_recipe <- training(base_split) %>%
+  recipe(tmin ~.) %>%
+  step_corr(all_numeric()) %>%
+  step_normalize(all_numeric(), -all_outcomes()) 
+  
+  base_recipe
+
+}
+```
 
 ```{r}
 # receta
@@ -171,52 +200,174 @@ show_best(base_rf_model, metric = "accuracy")
 
 
 ### Predicción en test-set
+
+#### Sin without SMOTE
+
 ```{r}
-#armo el workflow
+base_split <- data_split(data_clasificacion) 
+base_recipe <- receta_sin_smote(base_split)
+
 wf <- workflow() %>%
   add_recipe(base_recipe) %>% #agrego la receta
   add_model(base_rf_spec) #agrego el modelo
-wf 
-```
 
-
-```{r }
-#utilizamos la funcion last_fit junto al workflow y al split de datos
 final_fit <- last_fit(wf,split = base_split)
 
 
 final_fit %>%
   collect_metrics()
+  
+```
+```{r}
+
+accuracy <- final_fit %>%
+  collect_metrics() %>% 
+  select(.estimate) %>% 
+  as.vector() %>% 
+  .[[1]] %>% 
+  .[1] %>% round(4)
 ```
 
 ```{r}
-final_fit$.predictions[[1]] %>% recall(truth= tmin, .pred_class) 
-```
-
-```{r}
-final_fit$.predictions[[1]] %>% precision(truth= tmin, .pred_class) 
-```
-
-### pr_curve
-
-```{r}
-final_fit$splits[[1]]
-```
-```{r}
-final_fit$.predictions[[1]] %>% nrow()
-```
-
-```{r}
-final_fit$.predictions[[1]]
-```
-
-```{r}
-final_fit$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) %>% autoplot()
+roc_auc <- final_fit %>%
+  collect_metrics() %>% 
+  select(.estimate) %>% 
+  as.vector() %>% 
+  .[[1]] %>% 
+  .[2] %>% round(4)
 ```
 
 
-### roc curve
+```{r}
+recall <- final_fit$.predictions[[1]] %>%
+  recall(truth= tmin, .pred_class) %>%
+  select(.estimate) %>%
+  as.numeric()  %>% round(4)
+```
 
 ```{r}
-final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% autoplot()
+precision <- final_fit$.predictions[[1]] %>%
+  precision(truth= tmin, .pred_class) %>%
+  select(.estimate) %>%
+  as.numeric()  %>% round(4)
+```
+
+```{r}
+config1 <- c(estacion,"sin-smote",accuracy,roc_auc,recall,precision)
+```
+
+pr_curve 
+
+```{r}
+pr_curve_sin_smote <- final_fit$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) 
+```
+
+
+ roc curve
+
+```{r}
+roc_curve_sin_smote <- final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) 
+```
+
+
+
+#### Con SMOTE 
+
+```{r}
+base_split <- data_split(data_clasificacion) 
+base_recipe <- receta_smote(base_split)
+
+wf <- workflow() %>%
+  add_recipe(base_recipe) %>% #agrego la receta
+  add_model(base_rf_spec) #agrego el modelo
+
+final_fit <- last_fit(wf,split = base_split)
+
+
+final_fit %>%
+  collect_metrics()
+  
+final_fit$.predictions[[1]] %>% recall(truth= tmin, .pred_class)   
+```
+```{r}
+accuracy <- final_fit %>%
+  collect_metrics() %>% 
+  select(.estimate) %>% 
+  as.vector() %>% 
+  .[[1]] %>% 
+  .[1] %>% round(4)
+```
+
+```{r}
+roc_auc <- final_fit %>%
+  collect_metrics() %>% 
+  select(.estimate) %>% 
+  as.vector() %>% 
+  .[[1]] %>% 
+  .[2] %>% round(4)
+```
+
+
+```{r}
+recall <- final_fit$.predictions[[1]] %>%
+  recall(truth= tmin, .pred_class) %>%
+  select(.estimate) %>%
+  as.numeric()  %>% round(4)
+```
+
+```{r}
+precision <- final_fit$.predictions[[1]] %>%
+  precision(truth= tmin, .pred_class) %>%
+  select(.estimate) %>%
+  as.numeric()  %>% round(4)
+```
+
+```{r}
+config2 <- c(estacion,"smote",accuracy,roc_auc,recall,precision)
+```
+
+pr_curve 
+
+```{r}
+pr_curve_smote <- final_fit$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) 
+```
+
+
+ roc curve
+
+```{r}
+roc_curve_smote <- final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) 
+```
+
+
+#### Comparación 
+
+```{r}
+df <- data.frame(rbind(config1,config2))
+colnames(df) <- c("estacion","config","accuracy","roc_auc","recall","precision")
+df
+```
+
+```{r}
+tablita <- pr_curve_sin_smote %>% add_column(configuracion="Sin SMOTE")
+```
+
+```{r}
+pr_curve_smote %>% 
+  add_column(configuracion="SMOTE") %>% 
+  bind_rows(tablita) %>% 
+  ggplot(aes(x=recall,y=precision,color=configuracion)) +
+  geom_line()
+```
+
+```{r}
+tablita <- roc_curve_sin_smote %>% add_column(configuracion="Sin SMOTE")
+```
+
+```{r}
+roc_curve_smote %>% 
+  add_column(configuracion="SMOTE") %>% 
+  bind_rows(tablita) %>% 
+  ggplot(aes(x=(1-specificity),y=sensitivity,color=configuracion)) +
+  geom_line()
 ```
