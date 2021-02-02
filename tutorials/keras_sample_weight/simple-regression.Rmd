@@ -1,0 +1,58 @@
+---
+title: "simple_regression"
+author: "Ana Laura Diedrichs"
+date: "2/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Simple regression
+
+Taken from https://www.datatechnotes.com/2019/01/regression-example-with-keras-in-r.html
+
+```{r}
+library(keras)
+```
+
+
+```{r}
+set.seed(123)
+N = 450
+n = seq(1:N)
+a = n/10+4*sin(n/10)+sample(-1:6,N,replace=T)+rnorm(N)
+b = n/8+4*sin(n/10)+sample(-3:3,N,replace=T)+rnorm(N) 
+c = n/6+4*sin(n/10)+sample(-5:1,N,replace=T)+rnorm(N)
+y = (a+b+c)/3+rnorm(N)
+ 
+plot(n, c, col="orange", pch=20, cex=.9)
+points(n, a, col="blue", pch=20, cex=.9)
+points(n, b, col="green", pch=20, cex=.9)
+points(n, y, col="red", type = "l",lwd=2)
+```
+
+
+```{r}
+x = as.matrix(data.frame(a,b,c))
+y = as.matrix(y)
+head(x)
+```
+
+```{r}
+
+model = keras_model_sequential() %>% 
+   layer_dense(units=64, activation="relu", input_shape=3) %>% 
+   layer_dense(units=32, activation = "relu") %>% 
+   layer_dense(units=1, activation="linear")
+ 
+model %>% compile(
+   loss = "mse",
+   optimizer =  "adam", 
+   metrics = list("mean_absolute_error")
+ )
+ 
+model %>% summary()
+```
+
