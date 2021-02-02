@@ -1,0 +1,283 @@
+---
+title: "weighted neural net regression"
+author: "Ana Laura Diedrichs"
+date: "2/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidymodels)
+```
+
+## Dataset
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
+    col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
+#View(dacc_daily_tmin)
+```
+
+## Nombres de las estaciones meteorológicas 
+
+```{r}
+estaciones <- c("junin","tunuyan","agua_amarga","las_paredes","la_llave")
+```
+
+
+## Función que genera el dataset para clasificación
+
+
+```{r}
+
+get_dataset_for_regression <- function(station_name)
+{
+  
+  if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
+
+  junin <- dacc_daily_tmin %>% 
+  select(starts_with(station_name)) %>% 
+  rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
+  # quita el junin. de los nombres de las columnas
+
+# Quiero predecir la temperatura mínima, si es o no es helada.
+
+  tmin <- junin %>% 
+    select(temp_min) 
+  
+  colnames(tmin) <- "tmin"
+  
+  
+  
+  
+  # para regresion
+   data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
+  
+  
+  
+  return(data_tmin)
+}
+
+
+
+```
+
+```{r}
+get_dataset_for_regression("tunuyan") %>% head()
+
+```
+
+## Obtener dataset para regresión 
+
+```{r}
+estacion <- "la_llave"
+dataset <- get_dataset_for_regression(estacion)
+```
+
+Plot de tmin y temp_min
+
+```{r}
+n <- seq(1:nrow(dataset))
+plot(n, dataset$tmin, col="blue", pch=20, cex=.9)
+points(n, dataset$temp_min, col="red", pch=5, cex=.9)
+```
+## split en training y testing
+
+```{r}
+data_split <- initial_split(dataset, prop = 4/5, strata = NULL)
+training_data <- training(data_split)
+testing_data <- testing(data_split)
+```
+
+## Receta 
+
+```{r}
+rec = recipe(tmin ~ ., data = training_data) %>% 
+  step_center(all_predictors()) %>% 
+  step_scale(all_predictors()) %>% 
+  prep()
+```
+
+
+## keras model
+
+```{r}
+library(keras)
+
+build_model = function(){
+  
+model = keras_model_sequential() %>% 
+  layer_dense(units = 64, activation = "relu", input_shape = ncol(training_data)-1) %>% 
+  layer_dense(units = 64, activation = "relu") %>% 
+  layer_dense(units = 1)
+  
+model %>% 
+  compile(loss = "mse",
+          optimizer = "rmsprop",
+          metrics = list("mae","mse"))
+
+return(model)
+}
+
+
+model1 = build_model()
+
+summary(model1)
+```
+
+
+## input and outputs
+
+```{r}
+training_baked = bake(rec, training_data, composition = "matrix")
+x = subset(training_baked, select = -tmin)
+y = training_baked[,"tmin"]
+```
+
+## fit the model 
+
+```{r}
+history1 = model1 %>% fit(
+  x = x,
+  y = y,
+  batch_size = 50,
+  epoch = 100
+)
+```
+
+```{r}
+plot(history1)+
+  labs(title = "Neural Net Metrics")+
+  theme(strip.placement = "outside",
+        strip.text.y = element_text(size = 9),
+        plot.title = element_text(hjust = 0.5))
+```
+
+## Predictions 
+
+```{r}
+testing_baked = bake(rec,testing_data, composition = "matrix")
+xx = subset(testing_baked, select = -tmin)
+```
+
+```{r}
+y_pred = predict(model1, xx)[,1]
+```
+
+add predictions to dataset 
+
+```{r}
+predicted = testing_data %>% 
+  mutate(tmin_pred = y_pred,
+         resid = tmin-tmin_pred)
+```
+
+calcular algunas métricas del ajuste (fit metrics)
+
+```{r}
+mae(predicted, truth = tmin, estimate = tmin_pred)
+
+rmse(predicted, truth = tmin, estimate = tmin_pred)
+
+rsq(predicted, truth = tmin, estimate = tmin_pred)
+
+```
+plot the predictions
+
+```{r}
+ggplot(data = predicted, aes(x = tmin))+
+  geom_abline(intercept = 0, slope = 1, color = "navy")+
+  geom_point(aes(y = tmin_pred))+
+  coord_fixed()
+```
+
+
+```{r}
+ggplot() + 
+  geom_line(data = predicted, aes(x = 1:(nrow(predicted)), y = tmin), color = "blue") +
+  geom_line(data = predicted, aes(x = 1:(nrow(predicted)), y = tmin_pred), color = "red") +
+  xlab('Dates') +
+  ylab('Tmin')
+
+```
+
+# Ahora con entrenamiento dando más peso a los números negativos
+
+
+## fit the model 
+
+
+```{r}
+pesos <- case_when(
+          training_data$tmin <= 0 ~ 1,
+          TRUE ~ 0.01
+        )
+```
+
+```{r}
+history2 = model1 %>% fit(
+  x = x,
+  y = y,
+  batch_size = 50,
+  epoch = 100,
+  sample_weight = pesos
+)
+```
+
+
+```{r}
+plot(history2)+
+  labs(title = "Neural Net Metrics")+
+  theme(strip.placement = "outside",
+        strip.text.y = element_text(size = 9),
+        plot.title = element_text(hjust = 0.5))
+```
+
+## Predictions 
+
+```{r}
+testing_baked = bake(rec,testing_data, composition = "matrix")
+xx = subset(testing_baked, select = -tmin)
+```
+
+```{r}
+y_pred = predict(model1, xx)[,1]
+```
+
+add predictions to dataset 
+
+```{r}
+predicted = testing_data %>% 
+  mutate(tmin_pred = y_pred,
+         resid = tmin-tmin_pred)
+```
+
+calcular algunas métricas del ajuste (fit metrics)
+
+```{r}
+mae(predicted, truth = tmin, estimate = tmin_pred)
+
+rmse(predicted, truth = tmin, estimate = tmin_pred)
+
+rsq(predicted, truth = tmin, estimate = tmin_pred)
+
+```
+plot the predictions
+
+```{r}
+ggplot(data = predicted, aes(x = tmin))+
+  geom_abline(intercept = 0, slope = 1, color = "navy")+
+  geom_point(aes(y = tmin_pred))+
+  coord_fixed()
+```
+
+```{r}
+ggplot() + 
+  geom_line(data = predicted, aes(x = 1:(nrow(predicted)), y = tmin), color = "blue") +
+  geom_line(data = predicted, aes(x = 1:(nrow(predicted)), y = tmin_pred), color = "red") +
+  xlab('Dates') +
+  ylab('Tmin')
+
+```
