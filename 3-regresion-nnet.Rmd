@@ -202,7 +202,18 @@ ggplot() +
   ylab('Tmin')
 
 ```
+```{r}
+heladas <- predicted %>% select(tmin,tmin_pred) %>% filter(tmin <=0  )
+```
 
+```{r}
+mae(heladas, truth = tmin, estimate = tmin_pred)
+
+rmse(heladas, truth = tmin, estimate = tmin_pred)
+
+rsq(heladas, truth = tmin, estimate = tmin_pred)
+
+```
 # Ahora con entrenamiento dando más peso a los números negativos
 
 
@@ -279,5 +290,17 @@ ggplot() +
   geom_line(data = predicted, aes(x = 1:(nrow(predicted)), y = tmin_pred), color = "red") +
   xlab('Dates') +
   ylab('Tmin')
+
+```
+```{r}
+heladas <- predicted %>% select(tmin,tmin_pred) %>% filter(tmin <=0  )
+```
+
+```{r}
+mae(heladas, truth = tmin, estimate = tmin_pred)
+
+rmse(heladas, truth = tmin, estimate = tmin_pred)
+
+rsq(heladas, truth = tmin, estimate = tmin_pred)
 
 ```
