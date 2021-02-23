@@ -27,14 +27,19 @@ dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv",
 #View(dacc_daily_tmin)
 ```
 
+```{r}
+estacion1 <- "junin"
+estacion2 <- "tunuyan"
+```
+
 ## Create dataset for one station
 
 Solo tomaré la estación de Junín
 
 ```{r}
 junin <- dacc_daily_tmin %>% 
-  select(starts_with("junin")) %>% 
-  rename_with( ~ tolower(gsub("junin.", "", .x, fixed = TRUE))) # quita el junin. de los nombres de las columnas
+  select(starts_with(estacion1)) %>% 
+  rename_with( ~ tolower(gsub(paste0(estacion1,"."), "", .x, fixed = TRUE))) # quita el junin. de los nombres de las columnas
 ```
 
 Quiero predecir la temperatura mínima, si es o no es helada.
@@ -274,7 +279,7 @@ Solo tomaré la estación de Junín y Tunuyan
 
 ```{r}
 junin_tunuyan <- dacc_daily_tmin %>% 
-  select(starts_with("junin") | starts_with("tunuyan") ) #%>% 
+  select(starts_with(estacion1) | starts_with(estacion2) ) #%>% 
   #rename_with( ~ tolower(gsub("junin.", "", .x, fixed = TRUE))) # quita el junin. de los nombres de las columnas
 ```
 
@@ -282,7 +287,7 @@ Quiero predecir la temperatura mínima, si es o no es helada.
 
 ```{r}
 tmin <- junin_tunuyan %>% 
-  select(junin.temp_min) 
+  select( starts_with(estacion1) & ends_with("temp_min")) 
 
 colnames(tmin) <- "tmin"
 
@@ -340,8 +345,8 @@ set.seed(4848) #setear la semilla
 base_recipe_jt <- training(base_split_jt) %>%
   recipe(tmin ~.) %>%
   step_corr(all_numeric()) %>%
-  step_normalize(all_numeric(), -all_outcomes())  %>%
-  step_smote(tmin) 
+  step_normalize(all_numeric(), -all_outcomes())  #%>%
+#  step_smote(tmin) 
 base_recipe
 ```
 Cross-validation fit
@@ -419,13 +424,13 @@ final_fit_jt$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% autopl
 #### pr curve 
 
 ```{r}
-tablita <- final_fit_jt$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) %>% add_column(model="Junin+Tunuyan")
+tablita <- final_fit_jt$.predictions[[1]] %>% pr_curve(truth=tmin,.pred_helada) %>% add_column(model=paste0(estacion1,"+",estacion2))
 ```
 
 ```{r}
 final_fit$.predictions[[1]] %>% 
   pr_curve(truth=tmin,.pred_helada) %>% 
-  add_column(model="Junin") %>% 
+  add_column(model=estacion1) %>% 
   bind_rows(tablita) %>% 
   ggplot(aes(x=recall,y=precision,color=model)) +
   geom_line()
@@ -438,13 +443,13 @@ final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada)
 ```
 
 ```{r}
-tt <- final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% add_column(model = "Junin")
+tt <- final_fit$.predictions[[1]] %>% roc_curve(truth=tmin,.pred_helada) %>% add_column(model = estacion1)
 ```
 
 ```{r}
 final_fit_jt$.predictions[[1]] %>% 
   roc_curve(truth=tmin,.pred_helada)  %>% 
-  add_column(model="Junin+Tunuyan") %>% 
+  add_column(model= paste0(estacion1,"+",estacion2)) %>% 
   bind_rows(tt) %>% 
   ggplot(aes(x=(1-specificity),y=sensitivity,color=model)) +
   geom_line()
