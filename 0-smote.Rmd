@@ -80,16 +80,18 @@ get_dataset_for_classification <- function(station_name)
 
 ```
 
-```{r}
-get_dataset_for_classification("tunuyan") %>% head()
-
-```
 
 ## Obtener dataset para clasificación 
 
 ```{r}
-estacion <- "la_llave"
+estacion <- "junin"   ### <<<<<<<<<<<<-----------------
 data_clasificacion <- get_dataset_for_classification(estacion)
+```
+
+
+```{r}
+get_dataset_for_classification(estacion) %>% head()
+
 ```
 
 ## clasificador sin SMOTE 
