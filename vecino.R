@@ -12,21 +12,17 @@ get_dataset_for_classification <- function(station_name)
   
   if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
   
-  junin <- dacc_daily_tmin %>% 
-    select(starts_with(station_name)) %>% 
-    rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
+  junin <- dacc_daily_tmin 
   # quita el junin. de los nombres de las columnas
   
   # Quiero predecir la temperatura mínima, si es o no es helada.
   
   tmin <- junin %>% 
-    select(temp_min) 
+    select( starts_with(station_name) & ends_with("temp_min")) 
   
   colnames(tmin) <- "tmin"
   
-  
   tmin_helada <- tmin
-  
   tmin_helada <- tmin_helada %>% mutate(tmin = case_when(
     tmin <= 0 ~ as.character("helada"),  # frost event
     TRUE ~ as.character("no-helada")   # no frost
@@ -44,27 +40,81 @@ get_dataset_for_classification <- function(station_name)
   return(data_clasificacion)
 }
 
-entrenar <- function(s){}
-entrenar <- function(s,v){}
-entrenar <- function(s,v,m){}
+data_split <- function(dataset,prop = 0.75) {
+  
+  base_split <- dataset %>%
+    initial_split(prop=prop) # divido en prop %
+  return(base_split)
+}
+
+receta_sin_smote <- function(un_split) {
+  
+  base_recipe <- training(un_split) %>%
+    recipe(tmin~.) %>%
+    step_corr(all_numeric()) %>%
+    step_normalize(all_numeric(), -all_outcomes()) 
+  
+  base_recipe
+  
+}
+
+base_training <- function(data_clasificacion){
+  
+  base_split <- data_split(data_clasificacion) 
+  base_recipe <- receta_sin_smote(base_split)
+  base_rf_spec <- rand_forest() %>% 
+    set_engine("ranger") %>% 
+    set_mode("classification")
+  
+  wf <- workflow() %>%
+    add_recipe(base_recipe) %>% #agrego la receta
+    add_model(base_rf_spec) #agrego el modelo
+  
+  final_fit <- last_fit(wf,split = base_split)
+  # obtengo roc_auc
+  final_fit %>% collect_metrics() %>% select(.estimate) %>% .[[1]] %>%  .[2] %>% round(4)
+}
+
+
+filtrar <- function(data,s,v=NULL,m=NULL){
+  
+  if(is.null(v) & is.null(m)) {
+    dataset <- data %>% 
+    select(starts_with(s) | starts_with("tmin"))
+  }else if(is.null(m))
+  {
+    dataset <-data %>% 
+      select(starts_with(s) | starts_with(v)| starts_with("tmin"))
+  }else{
+    dataset <-data %>% 
+      select(starts_with(s) | starts_with(v) | starts_with(m) | starts_with("tmin"))
+  }
+  
+}
 
 for(s in estaciones){
   
+  data <- get_dataset_for_classification(s)
+  dataset <- filtrar(data,s)
+  auc <- base_training(dataset)
+  cat(s,",",auc,"\n")
+  
+  
   vecinos <- estaciones[!(estaciones %in% s)] # Quito s de estaciones para obtener sus vecinos
   
-  entrenar(s)
-  print(s)
-  
   for(v in vecinos){
-    entrenar(s,v)
-    cat(s,v,"\n")
+    
+    dataset <- filtrar(data,s,v)
+    auc <- base_training(dataset)
+    cat(s,",",v,",",auc,"\n")
     
     tripletes <- vecinos[!(vecinos %in% v)] # Quito v de vecinos
     
     for(m in tripletes){
       
-      entrenar(s,v,m)
-      cat(s,v,m,"\n")
+      dataset <- filtrar(data,s,v,m)
+      auc <- base_training(dataset)
+      cat(s,",",v,m,",",auc,"\n")
     }
     
     vecinos <- vecinos[!(vecinos %in% v)]
