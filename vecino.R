@@ -97,7 +97,7 @@ for(s in estaciones){
   data <- get_dataset_for_classification(s)
   dataset <- filtrar(data,s)
   auc <- base_training(dataset)
-  cat(s,",",auc,"\n")
+  cat(s,",,",auc,"\n", file = "output.csv", append = TRUE)
   
   
   vecinos <- estaciones[!(estaciones %in% s)] # Quito s de estaciones para obtener sus vecinos
@@ -106,7 +106,7 @@ for(s in estaciones){
     
     dataset <- filtrar(data,s,v)
     auc <- base_training(dataset)
-    cat(s,",",v,",",auc,"\n")
+    cat(s,",",v,",",auc,"\n", file = "output.csv", append = TRUE)
     
     tripletes <- vecinos[!(vecinos %in% v)] # Quito v de vecinos
     
@@ -114,11 +114,14 @@ for(s in estaciones){
       
       dataset <- filtrar(data,s,v,m)
       auc <- base_training(dataset)
-      cat(s,",",v,m,",",auc,"\n")
+      cat(s,",",v,m,",",auc,"\n", file = "output.csv", append = TRUE)
     }
     
     vecinos <- vecinos[!(vecinos %in% v)]
     
   }
  #TODO  entrenar con todas las estaciones 
+  auc <- base_training(data)
+  cat(s,",","todos",",",auc,"\n", file = "output.csv", append = TRUE)
+  
 }

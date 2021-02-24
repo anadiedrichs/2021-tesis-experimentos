@@ -1,0 +1,60 @@
+junin ,, 0.9492 
+junin , tunuyan , 0.9621 
+junin , tunuyan agua_amarga , 0.9382 
+junin , tunuyan las_paredes , 0.9557 
+junin , tunuyan la_llave , 0.9517 
+junin , agua_amarga , 0.9305 
+junin , agua_amarga las_paredes , 0.9477 
+junin , agua_amarga la_llave , 0.9312 
+junin , las_paredes , 0.9508 
+junin , las_paredes la_llave , 0.9401 
+junin , la_llave , 0.9598 
+junin , todos , 0.9428 
+tunuyan ,, 0.9529 
+tunuyan , junin , 0.9529 
+tunuyan , junin agua_amarga , 0.9495 
+tunuyan , junin las_paredes , 0.956 
+tunuyan , junin la_llave , 0.9483 
+tunuyan , agua_amarga , 0.9537 
+tunuyan , agua_amarga las_paredes , 0.9484 
+tunuyan , agua_amarga la_llave , 0.9461 
+tunuyan , las_paredes , 0.9572 
+tunuyan , las_paredes la_llave , 0.9469 
+tunuyan , la_llave , 0.9465 
+tunuyan , todos , 0.9576 
+agua_amarga ,, 0.9488 
+agua_amarga , junin , 0.9565 
+agua_amarga , junin tunuyan , 0.9437 
+agua_amarga , junin las_paredes , 0.9526 
+agua_amarga , junin la_llave , 0.9594 
+agua_amarga , tunuyan , 0.9402 
+agua_amarga , tunuyan las_paredes , 0.9475 
+agua_amarga , tunuyan la_llave , 0.9386 
+agua_amarga , las_paredes , 0.9549 
+agua_amarga , las_paredes la_llave , 0.9492 
+agua_amarga , la_llave , 0.9496 
+agua_amarga , todos , 0.96 
+las_paredes ,, 0.9326 
+las_paredes , junin , 0.938 
+las_paredes , junin tunuyan , 0.9345 
+las_paredes , junin agua_amarga , 0.9471 
+las_paredes , junin la_llave , 0.9345 
+las_paredes , tunuyan , 0.9327 
+las_paredes , tunuyan agua_amarga , 0.9431 
+las_paredes , tunuyan la_llave , 0.9378 
+las_paredes , agua_amarga , 0.9435 
+las_paredes , agua_amarga la_llave , 0.9305 
+las_paredes , la_llave , 0.952 
+las_paredes , todos , 0.9189 
+la_llave ,, 0.9467 
+la_llave , junin , 0.9499 
+la_llave , junin tunuyan , 0.9373 
+la_llave , junin agua_amarga , 0.9442 
+la_llave , junin las_paredes , 0.9289 
+la_llave , tunuyan , 0.931 
+la_llave , tunuyan agua_amarga , 0.9465 
+la_llave , tunuyan las_paredes , 0.9464 
+la_llave , agua_amarga , 0.9474 
+la_llave , agua_amarga las_paredes , 0.9309 
+la_llave , las_paredes , 0.9424 
+la_llave , todos , 0.9289 
