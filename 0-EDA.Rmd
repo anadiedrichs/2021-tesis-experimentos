@@ -1,0 +1,128 @@
+---
+title: "EDA-PCA"
+author: "Ana Laura Diedrichs"
+date: "16/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(plotly)
+library(ggplot2)
+
+```
+
+## Gráficos descriptivos
+
+```{r}
+library(readr)
+dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
+    col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
+#View(dacc_daily_tmin)
+```
+
+```{r}
+library(DataExplorer)
+
+DataExplorer::plot_histogram(dacc_daily_tmin[-1]) # remove column date
+```
+
+
+```{r}
+library(corrr)
+library(dplyr)
+dacc_daily_tmin %>% select(-c(date) ) %>%  correlate()
+
+dacc_daily_tmin %>% select(-c(date) ) %>%  correlate() %>% rplot()
+```
+
+# PCA 
+
+Tmin es según helada en Tunuyán
+
+
+```{r}
+library(factoextra)
+res.pca <- prcomp(dacc_daily_tmin[-1], scale = TRUE, cor= TRUE)
+fviz_eig(res.pca)
+```
+
+
+```{r}
+names(res.pca)
+```
+```{r}
+biplot(res.pca, scale = 0)
+```
+```{r}
+library(ggbiplot)
+simple_plot <- ggbiplot(pcobj = res.pca, scale = 0)
+simple_plot
+```
+```{r}
+ggplotly(simple_plot)
+```
+
+```{r}
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+```
+
+# boxplot por helada al dia siguiente
+
+## La llave 
+
+```{r}
+
+```
+
+# Series temporales
+```{r}
+
+#TODO improve this with purrr 
+library(dplyr)
+
+data_junin <-  dacc_daily_tmin %>% select(date,starts_with("junin")) %>% 
+  rename_with( ~ tolower(gsub(paste0("junin","."), "", .x, fixed = TRUE))) 
+
+data_tunuyan <-  dacc_daily_tmin %>% select(date,starts_with("tunuyan")) %>% 
+  rename_with( ~ tolower(gsub(paste0("tunuyan","."), "", .x, fixed = TRUE))) 
+
+data_llave <-  dacc_daily_tmin %>% select(date,starts_with("la_llave")) %>% 
+  rename_with( ~ tolower(gsub(paste0("la_llave","."), "", .x, fixed = TRUE))) 
+
+data_paredes <-  dacc_daily_tmin %>% select(date,starts_with("las_paredes")) %>% 
+  rename_with( ~ tolower(gsub(paste0("las_paredes","."), "", .x, fixed = TRUE))) 
+
+data_aguaamarga <-  dacc_daily_tmin %>% select(date,starts_with("agua")) %>% 
+  rename_with( ~ tolower(gsub(paste0("agua","."), "", .x, fixed = TRUE))) 
+
+```
+
+```{r}
+head(data_llave)
+```
+
+## Temperatura máxima, media y temperatura mínima en el tiempo 
+
+### La llave 
+
+```{r, echo=FALSE,message=FALSE}
+library(plotly)
+library(ggplot2)
+
+
+g <-ggplot(data_llave, aes(x=date)) + 
+  geom_line(aes(y = temp_max), color = "darkred") + 
+  geom_line(aes(y = temp_min), color="steelblue", linetype="twodash")+ 
+  geom_line(aes(y = temp_med), color="green", linetype="twodash")
+
+ggplotly(g)
+```
+
+
+
+
