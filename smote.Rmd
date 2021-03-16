@@ -21,10 +21,13 @@ library(DataExplorer)
 ## Load raw dataset
 
 ```{r, message=FALSE, warning=FALSE}
-library(readr)
-dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
-    col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
-#View(dacc_daily_tmin)
+library(here)
+source(here("utils","dataset-processing.R"))
+
+# global variables
+
+dacc_daily_tmin <- get.dataset("dacc")$data
+
 ```
 
 ## Nombres de las estaciones meteorológicas 
@@ -84,7 +87,7 @@ get_dataset_for_classification <- function(station_name)
 ## Obtener dataset para clasificación 
 
 ```{r}
-estacion <- "junin"   ### <<<<<<<<<<<<-----------------
+estacion <- "la_llave"   ### <<<<<<<<<<<<-----------------
 data_clasificacion <- get_dataset_for_classification(estacion)
 ```
 
