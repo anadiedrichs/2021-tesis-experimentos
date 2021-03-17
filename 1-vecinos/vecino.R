@@ -1,9 +1,11 @@
 library(tidyverse)
 library(tidymodels)
+library(here)
+source(here("utils","dataset-processing.R"))
 
+# global variables
 
-dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
-                            col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
+dacc_daily_tmin <- get.dataset("dacc")$data
 
 estaciones <- c("junin","tunuyan","agua_amarga","las_paredes","la_llave")
 
