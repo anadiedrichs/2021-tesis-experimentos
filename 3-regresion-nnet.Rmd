@@ -64,18 +64,18 @@ get_dataset_for_regression <- function(station_name)
 
 ```
 
-```{r}
-get_dataset_for_regression("tunuyan") %>% head()
 
-```
 
 ## Obtener dataset para regresión 
 
 ```{r}
-estacion <- "la_llave"
+estacion <- "tunuyan"
 dataset <- get_dataset_for_regression(estacion)
 ```
+```{r}
+get_dataset_for_regression(estacion) %>% head()
 
+```
 Plot de tmin y temp_min
 
 ```{r}
@@ -214,6 +214,17 @@ rmse(heladas, truth = tmin, estimate = tmin_pred)
 rsq(heladas, truth = tmin, estimate = tmin_pred)
 
 ```
+
+```{r}
+valor_real <- cut(predicted$tmin,breaks = c(-50,0,50))
+valor_predicho <- cut(predicted$tmin_pred,breaks = c(-50,0,50))
+```
+
+```{r}
+table(valor_real,valor_predicho)
+```
+
+
 # Ahora con entrenamiento dando más peso a los números negativos
 
 
@@ -297,10 +308,22 @@ heladas <- predicted %>% select(tmin,tmin_pred) %>% filter(tmin <=0  )
 ```
 
 ```{r}
+nrow(heladas)
+```
+
+```{r}
 mae(heladas, truth = tmin, estimate = tmin_pred)
 
 rmse(heladas, truth = tmin, estimate = tmin_pred)
 
 rsq(heladas, truth = tmin, estimate = tmin_pred)
 
+```
+```{r}
+valor_real <- cut(predicted$tmin,breaks = c(-50,0,50))
+valor_predicho <- cut(predicted$tmin_pred,breaks = c(-50,0,50))
+```
+
+```{r}
+table(valor_real,valor_predicho)
 ```
