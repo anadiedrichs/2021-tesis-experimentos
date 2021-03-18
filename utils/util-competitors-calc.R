@@ -1,148 +1,169 @@
 library(frost)
 library(caret)
 library(dplyr)
-source("dataset-processing.R")
-source("metrics.R")
+library(here)
 
 # global variables
 
-dataset <- get.dataset("dacc")
 
-data <- dataset$data
-#dividir dataset en entrenamiento y testeo.
-### Training set y test dataset
-# porcentaje para train set split
-porc_train = 0.68
-until <- round(nrow(data)*porc_train)
+# get dataset for classification 
+#     ya viene dataset desfasado a un dia, todos los datos menos radiacion
+#     por lo tanto llama a get.dataset("dacc")
+# 
+estaciones <- c("junin","tunuyan","agua_amarga","las_paredes","la_llave")
 
-
-
-# return table of results for each station
-competitors_calculation <- function(station_name)
+get_dataset_for_regression <- function(station_name)
 {
+  dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
+                              col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
   
-  vars <- vars.del.sensor(station_name,colnames(data)) # variables de la estacion #TODO
   
-  training.set = data[1:until-1, vars] # This is training set to learn the parameters
+  if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
+  junin <- dacc_daily_tmin %>% 
+    select(-contains("radiacion_") & starts_with(station_name)) %>% 
+    rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
+  # quita el junin. de los nombres de las columnas
   
-  test.set = data[until:nrow(data), vars]
+  # Quiero predecir la temperatura mínima, si es o no es helada.
+  tmin <- junin %>% 
+    select(temp_min) 
+  colnames(tmin) <- "tmin"
+  # para regresion
+  data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
+  return(data_tmin)
+}
+
+get_dataset_for_classification <- function(station_name)
+{ 
+  dacc_daily_tmin <- read_csv("data/dacc-daily-tmin.csv", 
+                              col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
   
-  station <- unlist(strsplit(station_name,split=".",fixed = TRUE))[1]
+  if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
   
-  nombres <- training.set %>% dplyr::rename_all(~stringr::str_replace_all(., paste(station,".",sep=""), "")) %>% colnames()
-  colnames(training.set) <- nombres
-  colnames(test.set) <- nombres
+  junin <- dacc_daily_tmin %>% 
+    select(-contains("radiacion") & starts_with(station_name)) %>% 
+    rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
+  # quita el junin. de los nombres de las columnas
   
-  dewpoint <- calcDewPoint(training.set$humedad_med,training.set$temp_med,mode = "C")
-  dw.test <- calcDewPoint(test.set$humedad_med,test.set$temp_med,mode = "C")
+  # Quiero predecir la temperatura mínima, si es o no es helada.
   
-  model.mza <- buildMdz(dw=dewpoint, tempMax=training.set$temp_max, tmin=training.set$temp_min)
+  tmin <- junin %>% 
+    select(temp_min) 
   
+  colnames(tmin) <- "tmin"
+  
+  
+  tmin_helada <- tmin
+  
+  tmin_helada <- tmin_helada %>% mutate(tmin = case_when(
+    tmin <= 0 ~ as.character("helada"),  # frost event
+    TRUE ~ as.character("no-helada")   # no frost
+  ))
+  
+  # para regresion
+  # data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
+  
+  data_clasificacion <- cbind(junin[1:(nrow(junin)-1),],tmin_helada[2:nrow(tmin_helada),])
+  
+  #Convierto a factor la columna tmin
+  
+  data_clasificacion$tmin <- as.factor(data_clasificacion$tmin)
+  
+  return(data_clasificacion)
+}
+# https://gist.githubusercontent.com/charly06/91578196fc615c5a79c7174318be4349/raw/d96a98c2933f5af141eac91af83c7895062d68a5/ggrocs.R
+ggrocs <- function(rocs, breaks = seq(0,1,0.1), legendTitel = "Leyenda") {
+  if (length(rocs) == 0) {
+    stop("No ROC objects available in param rocs.")
+  } else {
+    require(plyr)
+    # Store all sensitivities and specifivities in a data frame
+    # which an be used in ggplot
+    RocVals <- plyr::ldply(names(rocs), function(rocName) {
+      if(class(rocs[[rocName]]) != "roc") {
+        stop("Please provide roc object from pROC package")
+      }
+      data.frame(
+        fpr = rev(rocs[[rocName]]$specificities),
+        tpr = rev(rocs[[rocName]]$sensitivities),
+        names = rep(rocName, length(rocs[[rocName]]$sensitivities)),
+        stringAsFactors = T
+      )
+    })
+    
+    aucAvg <- mean(sapply(rocs, "[[", "auc"))
+    
+    rocPlot <- ggplot(RocVals, aes(x = fpr, y = tpr, colour = names)) +
+      geom_segment(aes(x = 0, y = 1, xend = 1,yend = 0), alpha = 0.5, colour = "gray") + 
+      geom_step() +
+      scale_x_reverse(name = "False Positive Rate (1 - Specificity)",limits = c(1,0), breaks = breaks) + 
+      scale_y_continuous(name = "True Positive Rate (Sensitivity)", limits = c(0,1), breaks = breaks) +
+      theme_bw() + 
+      coord_equal() + 
+      annotate("text", x = 0.1, y = 0.1, vjust = 0, label = paste("AUC =",sprintf("%.3f",aucAvg))) +
+      guides(colour = guide_legend(legendTitel)) +
+      theme(axis.ticks = element_line(color = "grey80"))
+    
+    rocPlot
+  }
+}
+# train and test come from get.data.for.classification
+experimento <- function(estacion)
+{
+  dataset <- get_dataset_for_classification(estacion)
+  
+  porc_train = 0.68
+  until <- round(nrow(dataset)*porc_train)
+  
+  train_set = dataset[1:until-1, ] 
+  test_set = dataset[until:nrow(dataset), ]
+  
+  # cálculo punto de rocío
+  dw.train <- calcDewPoint(train_set$humedad_med,train_set$temp_med,mode = "C")
+  dw.test <- calcDewPoint(test_set$humedad_med,test_set$temp_med,mode = "C")
+  # buildMdz  
+  model.mza <- buildMdz(dw=dw.train, tempMax=train_set$temp_max, tmin=train_set$temp_min)
   # espero un arreglo de valores. si da error, deberé usar sapply.
-  predmza <- predMdz(dw = dw.test, tempMax = test.set$temp_max, model=model.mza)
+  predmza <- predMdz(dw = dw.test, tempMax = test_set$temp_max, model=model.mza)
+  #plot(predmza,test_set$temp_min)
   
-  ev.mza <- evaluate(predmza,test.set$temp_min)
-  
-#  plot(predmza,test.set$temp_min)
-  
-  model.FAO <- buildFAO(dw=dewpoint,temp = training.set$temp_med,tmin=training.set$temp_min)
-  
+  model.FAO <- buildFAO(dw=dw.train,temp = train_set$temp_med,tmin=train_set$temp_min)
   # espero un arreglo de valores. si da error, deberé usar sapply.
-  predfao <- predFAO(model=model.FAO,t=test.set$temp_med,dw=dw.test)
+  predfao <- predFAO(model=model.FAO,t=test_set$temp_med,dw=dw.test)
   # comparar resultados
-  ev.fao <- evaluate(predfao,test.set$temp_min)
+  #plot(predfao,test_set$temp_min)
   
-  #plot(pred,test.set$junin.temp_min)
-  
-  return(list(predmza=predmza,evalMza=ev.mza,predfao=predfao,evalFAO=ev.fao))
-}
-
-
-# to test competitors method above
-#cc <- competitors_calculation(dataset$pred[1]) # nombre de variable a predecir!! 
-
-colheader <- c("Station","Method","MAE","r2","RMSE","Recall","Spec","F1")
-
-df <- data.frame(Station=character(),
-                 Method=character(),
-                 MAE=double(),
-                 r2=double(),
-                 RMSE=double(),
-                 Recall=double(),
-                 Specificity=double(),
-                 F1=double(),
-                  stringsAsFactors = FALSE)
-
-#df <- NULL
-
-for(place in dataset$pred)
-{
-  station <- unlist(strsplit(place,split=".",fixed = TRUE))[1]
-  
-  cc <- competitors_calculation(place)
-  
-  #  row <- data.frame(station,"buildMdz",cc$evalMza$MAE,cc$evalMza$r2,cc$evalMza$rmse,cc$evalMza$sens,cc$evalMza$spec,cc$evalMza$cm$byClass["F1"])
-  
-  row <- data.frame(Station=station,
-                    Method="buildMdz",
-                    MAE=cc$evalMza$MAE,
-                    r2=cc$evalMza$r2,
-                    RMSE=cc$evalMza$rmse,
-                    Recall=cc$evalMza$sens,
-                    Specificity=cc$evalMza$spec,
-                    F1=cc$evalMza$cm$byClass["F1"],
-                    stringsAsFactors = FALSE)
-  df <- rbind(df,row,stringsAsFactors=FALSE)
-  
-  row <- data.frame(Station=station,
-                     Method="FAO",
-                     MAE=cc$evalFAO$MAE,
-                     r2=cc$evalFAO$r2,
-                     RMSE=cc$evalFAO$rmse,
-                     Recall=cc$evalFAO$sens,
-                     Specificity=cc$evalFAO$spec,
-                     F1=cc$evalFAO$cm$byClass["F1"],
-                     stringsAsFactors = FALSE)
-  
- # row <- data.frame(station,"FAO",cc$evalFAO$MAE,cc$evalFAO$r2,cc$evalFAO$rmse,cc$evalFAO$sens,cc$evalFAO$spec,cc$evalFAO$cm$byClass["F1"])
-  df <- rbind(df,row,stringsAsFactors=FALSE)
-  
+  set.seed(852)
+  #logistic regresion
+  glm.fit <- glm(tmin ~ ., data = train_set, family = binomial)
+  pred.log <- predict(glm.fit,test_set)
   # random forest
-  rf <- read_csv(paste("dacc--",place,"--normal--all--1--rf--Y-vs-Y_pred.csv",sep=""))
-  rfeval <- evaluate(rf$y_pred,rf$y_real)
-  #row <- data.frame(station,"RF",rfeval$MAE,rfeval$r2,rfeval$rmse,rfeval$sens,rfeval$spec,rfeval$cm$byClass["F1"])
-  row <- data.frame(Station=station,
-                    Method="RF",
-                    MAE=rfeval$MAE,
-                    r2=rfeval$r2,
-                    RMSE=rfeval$rmse,
-                    Recall=rfeval$sens,
-                    Specificity=rfeval$spec,
-                    F1=rfeval$cm$byClass["F1"],
-                    stringsAsFactors = FALSE)
+  rf.fit <- ranger(tmin ~ ., data = train_set,probability = TRUE)
+  pred.rf <- predict(rf.fit,test_set)
   
-  df <- rbind(df,row,stringsAsFactors=FALSE)
   
-  # Bayesian networks
-  bn <- read_csv(paste("dacc--",place,"--normal--all--1--bnReg--Y-vs-Y_pred.csv",sep=""))
-  bneval <- evaluate(bn$y_pred,bn$y_real)
-  #row <- data.frame(station,"BN",bneval$MAE,bneval$r2,bneval$rmse,bneval$sens,bneval$spec,bneval$cm$byClass["F1"])
-  row <- data.frame(Station=station,
-                    Method="BN",
-                    MAE=bneval$MAE,
-                    r2=bneval$r2,
-                    RMSE=bneval$rmse,
-                    Recall=bneval$sens,
-                    Specificity=bneval$spec,
-                    F1=bneval$cm$byClass["F1"],
-                    stringsAsFactors = FALSE)
+  require(pROC)
+  lista <- list(buidMdz=roc(test_set$tmin,predmza),
+                FAO=roc(test_set$tmin,predfao),
+                RF=roc(test_set$tmin,pred.rf$predictions[,1]),
+                LogReg=roc(test_set$tmin,pred.log))
   
-  df <- rbind(df,row,stringsAsFactors=FALSE)
-  #plot(dacc_junin_bn$y_pred,dacc_junin_bn$y_real)
-  
+  return(lista)
 }
 
-colnames(df) <- colheader
-                          
-# save .csv file of results
-write.csv(df,file="competitors-table.csv")
+generar_plot <- function(lista,nombre)
+{
+  g <- ggrocs(lista)
+  ggsave(filename = paste0(nombre,"-competidores-roc.pdf"),plot=g,device="pdf")
+  g
+}
+
+#output <- experimento("junin")
+#ggrocs(output)
+
+#xx <- map(estaciones,experimento)
+
+#map2(xx,estaciones,generar_plot) 
+
+
+
