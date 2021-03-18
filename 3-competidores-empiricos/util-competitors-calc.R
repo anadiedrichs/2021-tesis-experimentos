@@ -91,7 +91,7 @@ ggrocs <- function(rocs, breaks = seq(0,1,0.1), legendTitel = "Leyenda") {
       )
     })
     
-    aucAvg <- mean(sapply(rocs, "[[", "auc"))
+    aucAvg <- str_c(names(rocs),round(sapply(rocs, "[[", "auc"),3),"\n", sep = ' ', collapse = "")
     
     rocPlot <- ggplot(RocVals, aes(x = fpr, y = tpr, colour = names)) +
       geom_segment(aes(x = 0, y = 1, xend = 1,yend = 0), alpha = 0.5, colour = "gray") + 
@@ -100,7 +100,7 @@ ggrocs <- function(rocs, breaks = seq(0,1,0.1), legendTitel = "Leyenda") {
       scale_y_continuous(name = "True Positive Rate (Sensitivity)", limits = c(0,1), breaks = breaks) +
       theme_bw() + 
       coord_equal() + 
-      annotate("text", x = 0.1, y = 0.1, vjust = 0, label = paste("AUC =",sprintf("%.3f",aucAvg))) +
+      annotate("text", x = 0.1, y = 0.4, vjust = 0, label = paste0("AUC \n", aucAvg)) +
       guides(colour = guide_legend(legendTitel)) +
       theme(axis.ticks = element_line(color = "grey80"))
     
@@ -143,7 +143,7 @@ experimento <- function(estacion)
   
   
   require(pROC)
-  lista <- list(buidMdz=roc(test_set$tmin,predmza),
+  lista <- list(buildMdz=roc(test_set$tmin,predmza),
                 FAO=roc(test_set$tmin,predfao),
                 RF=roc(test_set$tmin,pred.rf$predictions[,1]),
                 LogReg=roc(test_set$tmin,pred.log))
@@ -161,9 +161,9 @@ generar_plot <- function(lista,nombre)
 #output <- experimento("junin")
 #ggrocs(output)
 
-#xx <- map(estaciones,experimento)
+xx <- map(estaciones,experimento)
 
-#map2(xx,estaciones,generar_plot) 
+map2(xx,estaciones,generar_plot) 
 
 
 
