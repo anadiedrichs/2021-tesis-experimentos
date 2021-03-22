@@ -20,7 +20,7 @@ get_dataset_for_classification <- function(station_name)
   # Quiero predecir la temperatura mínima, si es o no es helada.
   
   tmin <- junin %>% 
-    select( starts_with(station_name) & ends_with("temp_min")) 
+    select( -contains("radiacion") & starts_with(station_name) & ends_with("temp_min")) 
   
   colnames(tmin) <- "tmin"
   
@@ -61,7 +61,7 @@ receta_sin_smote <- function(un_split) {
 }
 
 base_training <- function(data_clasificacion){
-  
+  set.seed(963)
   base_split <- data_split(data_clasificacion) 
   base_recipe <- receta_sin_smote(base_split)
   base_rf_spec <- rand_forest() %>% 
@@ -78,20 +78,16 @@ base_training <- function(data_clasificacion){
 }
 
 
-filtrar <- function(data,s,v=NULL,m=NULL){
+filtrar <- function(data,v=NULL,m=NULL){
   
-  if(is.null(v) & is.null(m)) {
-    dataset <- data %>% 
-    select(starts_with(s) | starts_with("tmin"))
-  }else if(is.null(m))
+  if(is.null(v) ) {
+    stop("The argument v shouldn't be null. ")
+  }else 
   {
-    dataset <-data %>% 
-      select(starts_with(s) | starts_with(v)| starts_with("tmin"))
-  }else{
-    dataset <-data %>% 
-      select(starts_with(s) | starts_with(v) | starts_with(m) | starts_with("tmin"))
+    dataset <- data %>% 
+      select(-contains("radiacion") & starts_with(c(v,"tmin")))
   }
-  
+  dataset
 }
 
 for(s in estaciones){
@@ -106,24 +102,39 @@ for(s in estaciones){
   
   for(v in vecinos){
     
-    dataset <- filtrar(data,s,v)
+    dataset <- filtrar(data,c(s,v))
     auc <- base_training(dataset)
     cat(s,",",v,",",auc,"\n", file = "output.csv", append = TRUE)
     
-    tripletes <- vecinos[!(vecinos %in% v)] # Quito v de vecinos
+    pares <- vecinos[!(vecinos %in% v)] # Quito v de vecinos
     
-    for(m in tripletes){
+    for(m in pares){
       
-      dataset <- filtrar(data,s,v,m)
+      dataset <- filtrar(data,c(s,v,m))
       auc <- base_training(dataset)
       cat(s,",",v,m,",",auc,"\n", file = "output.csv", append = TRUE)
+      
+      tripletes <- pares[!(pares %in% m)] # Quito v de vecinos
+      
+      for(n in tripletes){
+        
+        dataset <- filtrar(data,c(s,v,m,n))
+        auc <- base_training(dataset)
+        cat(s,",",v,m,n,",",auc,"\n", file = "output.csv", append = TRUE)
+      }
+      pares <- pares[!(pares %in% m)] 
+      
     }
     
     vecinos <- vecinos[!(vecinos %in% v)]
     
   }
- #TODO  entrenar con todas las estaciones 
+ #  entrenar con todas las estaciones 
   auc <- base_training(data)
   cat(s,",","todos",",",auc,"\n", file = "output.csv", append = TRUE)
   
 }
+#' TODO mejorar la iteración anterior:
+#' 1) las tres lineas de carga dataset, filtrar, calculo auc y cat archivo 
+#' podrían ir en una función
+#' 2) podría evaluarse si esto se implementa de forma recursiva. 
