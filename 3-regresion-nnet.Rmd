@@ -38,7 +38,7 @@ get_dataset_for_regression <- function(station_name)
   if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
 
   junin <- dacc_daily_tmin %>% 
-  select(starts_with(station_name)) %>% 
+  select(-contains("radiacion_") & starts_with(station_name)) %>% 
   rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
   # quita el junin. de los nombres de las columnas
 
