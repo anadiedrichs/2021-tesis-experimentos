@@ -1,4 +1,4 @@
-
+library(here)
 library(readr)
 library(xts)
 library(timeDate)
@@ -59,13 +59,13 @@ vars.del.sensor <- function(var,variables,dataset_tmin_chaar=FALSE)
 
 ur_data <- function()
 {
-  sensores <-  dataset_UR_diarios <- read_csv("../data/dataset_UR_diarios.csv")
+  sensores <-  dataset_UR_diarios <- read_csv(here("data","dataset_UR_diarios.csv"))
   pred_sensores <- colnames(sensores)[which(grepl("temp-min",colnames(sensores),fixed = TRUE))]
   return(list(data=sensores, pred= pred_sensores,name="ur"))
 }
 ur_temp_data <- function()
 {
-  sensores <-  dataset_UR_diarios <- read_csv("../data/dataset_UR_diarios.csv")
+  sensores <-  dataset_UR_diarios <- read_csv(here("data","dataset_UR_diarios.csv"))
   humRelCol <- colnames(sensores)[which(grepl("Hum",colnames(sensores),fixed = TRUE))]
   soilHumCol <- colnames(sensores)[which(grepl("soil",colnames(sensores),fixed = TRUE))]
   sensores <- sensores[-which(colnames(sensores) %in% c(humRelCol,soilHumCol))]
@@ -79,7 +79,7 @@ ur_temp_data <- function()
 
 inta_data <- function()
 {
-  sensores <- read_csv("../bnlearn/data/sensores.csv")
+  sensores <- read_csv(here("data","sensores.csv"))
   #' Columnas a borrar "X1" 
   #sensores <- sensores[-1]
   #' dejar columnas de max, min y media
@@ -99,7 +99,7 @@ inta_data <- function()
 dacc_v2 <- function()
 {
   
-  sensores <- suppressWarnings(read_csv("../data/dacc-daily-tmin.csv"))
+  sensores <- suppressWarnings(read_csv(here("data","dacc-daily-tmin.csv")))
   
   #' Columnas a borrar "X1" 
   sensores <- sensores[-1]
