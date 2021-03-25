@@ -9,4 +9,111 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## 
+```{r}
+library(here)
+source(here("utils","dataset.R"))
+library(ranger)
+library(dplyr)
+library(pROC)
+porc_train = 0.68
+
+```
+
+## Junin
+
+```{r}
+dataset <- get_dataset_for_classification_all("junin")
+dataset <- dataset %>% select(starts_with("junin") | starts_with("tunuyan")| starts_with("tmin"))
+
+set.seed(852)
+until <- round(nrow(dataset)*porc_train)
+train_set = dataset[1:until-1, ] 
+test_set = dataset[until:nrow(dataset), ]
+
+# random forest
+rf.fit <- ranger(tmin ~ ., data = train_set,probability = TRUE)
+pred.rf <- predict(rf.fit,test_set)
+
+r <- roc(test_set$tmin,pred.rf$predictions[,1])
+plot(r,print.auc=TRUE,print.thres=TRUE,grid=c(0.1, 0.1))
+
+```
+
+## Tunuyan
+
+```{r}
+dataset <- get_dataset_for_classification_all("tunuyan")
+#' filtro Tunuyan quien más ayuda
+dataset <- dataset %>% select(starts_with("junin") | starts_with("tunuyan")| starts_with("tmin"))
+
+set.seed(852)
+until <- round(nrow(dataset)*porc_train)
+train_set = dataset[1:until-1, ] 
+test_set = dataset[until:nrow(dataset), ]
+
+# random forest
+rf.fit <- ranger(tmin ~ ., data = train_set,probability = TRUE)
+pred.rf <- predict(rf.fit,test_set)
+
+r <- roc(test_set$tmin,pred.rf$predictions[,1])
+plot(r,print.auc=TRUE,print.thres=TRUE,grid=c(0.1, 0.1))
+```
+
+## Agua Amarga 
+
+```{r}
+dataset <- get_dataset_for_classification_all("agua_amarga")
+dataset <- dataset %>% select(starts_with("junin") | starts_with("la_llave")| starts_with("agua_amarga")| starts_with("tmin"))
+
+set.seed(852)
+until <- round(nrow(dataset)*porc_train)
+train_set = dataset[1:until-1, ] 
+test_set = dataset[until:nrow(dataset), ]
+
+# random forest
+rf.fit <- ranger(tmin ~ ., data = train_set,probability = TRUE)
+pred.rf <- predict(rf.fit,test_set)
+
+r <- roc(test_set$tmin,pred.rf$predictions[,1])
+plot(r,print.auc=TRUE,print.thres=TRUE,grid=c(0.1, 0.1))
+```
+
+
+## Las paredes 
+
+```{r}
+dataset <- get_dataset_for_classification_all("las_paredes")
+dataset <- dataset %>% select(starts_with("las_paredes") | starts_with("tunuyan")| starts_with("agua_amarga")| starts_with("tmin"))
+
+set.seed(852)
+until <- round(nrow(dataset)*porc_train)
+train_set = dataset[1:until-1, ] 
+test_set = dataset[until:nrow(dataset), ]
+
+# random forest
+rf.fit <- ranger(tmin ~ ., data = train_set,probability = TRUE)
+pred.rf <- predict(rf.fit,test_set)
+
+r <- roc(test_set$tmin,pred.rf$predictions[,1])
+plot(r,print.auc=TRUE,print.thres=TRUE,grid=c(0.1, 0.1))
+```
+
+## La LLave
+
+```{r}
+dataset <- get_dataset_for_classification_all("la_llave")
+dataset <- dataset %>% select(starts_with("la_llave") | starts_with("junin")| starts_with("agua_amarga")| starts_with("tmin"))
+
+set.seed(852)
+until <- round(nrow(dataset)*porc_train)
+train_set = dataset[1:until-1, ] 
+test_set = dataset[until:nrow(dataset), ]
+
+# random forest
+rf.fit <- ranger(tmin ~ ., data = train_set,probability = TRUE)
+pred.rf <- predict(rf.fit,test_set)
+
+r <- roc(test_set$tmin,pred.rf$predictions[,1])
+plot(r,print.auc=TRUE,print.thres=TRUE,grid=c(0.1, 0.1))
+```
+
