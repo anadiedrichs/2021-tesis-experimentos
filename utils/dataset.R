@@ -66,3 +66,63 @@ get_dataset_for_classification <- function(station_name)
   
   return(data_clasificacion)
 }
+
+get_dataset_for_classification_all <- function(station_name)
+{ 
+  dacc_daily_tmin <- read_csv(here("data","dacc-daily-tmin.csv"), 
+                              col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
+  
+  if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
+  
+  junin <- dacc_daily_tmin %>% 
+    select(-contains("radiacion") & starts_with(station_name)) %>% 
+    rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
+  # quita el junin. de los nombres de las columnas
+  
+  # Quiero predecir la temperatura mínima, si es o no es helada.
+  
+  tmin <- junin %>% 
+    select(temp_min) 
+  
+  colnames(tmin) <- "tmin"
+  
+  
+  tmin_helada <- tmin
+  
+  tmin_helada <- tmin_helada %>% mutate(tmin = case_when(
+    tmin <= 0 ~ as.character("helada"),  # frost event
+    TRUE ~ as.character("no-helada")   # no frost
+  ))
+  
+  # para regresion
+  # data_tmin <- cbind(junin[1:(nrow(junin)-1),],tmin[2:nrow(tmin),])
+  # pego columnas del dataset y luego tmin , quito columna dia 
+  data_clasificacion <- cbind(dacc_daily_tmin[1:(nrow(dacc_daily_tmin)-1),-1],tmin_helada[2:nrow(tmin_helada),])
+  
+  #Convierto a factor la columna tmin
+  
+  data_clasificacion$tmin <- as.factor(data_clasificacion$tmin)
+  
+  return(data_clasificacion)
+}
+
+get_dataset_for_regression_all <- function(station_name)
+{
+  dacc_daily_tmin <- read_csv(here("data","dacc-daily-tmin.csv"), 
+                              col_types = cols(X1 = col_skip(), date = col_date(format = "%Y-%m-%d")))
+  
+  
+  if(is.null(station_name) | !(station_name %in% estaciones) ) stop("station_name must be a valid name from estaciones")
+  junin <- dacc_daily_tmin %>% 
+    select(-contains("radiacion_") & starts_with(station_name)) %>% 
+    rename_with( ~ tolower(gsub(paste0(station_name,"."), "", .x, fixed = TRUE))) 
+  # quita el junin. de los nombres de las columnas
+  
+  # Quiero predecir la temperatura mínima, si es o no es helada.
+  tmin <- junin %>% 
+    select(temp_min) 
+  colnames(tmin) <- "tmin"
+  # para regresion
+  data_tmin <- cbind(dacc_daily_tmin[1:(nrow(dacc_daily_tmin)-1),-1],tmin[2:nrow(tmin),])
+  return(data_tmin)
+}
