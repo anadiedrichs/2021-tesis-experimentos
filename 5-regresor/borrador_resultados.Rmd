@@ -1,0 +1,218 @@
+---
+title: "borrador_resultados"
+author: "Ana Laura Diedrichs"
+date: "8/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Experimento
+
+```{r}
+source("script-regression.R")
+estaciones <- c("junin","tunuyan","agua_amarga","las_paredes","la_llave")
+
+#resultado <- experiment("las_paredes")
+
+resultado <- map(estaciones,experiment)
+
+result_pesos <- map(estaciones,experiment,weighted=TRUE)
+```
+
+
+# Junin
+
+## Metricas resultados
+
+```{r}
+resultado[[1]]$metric
+```
+
+
+
+```{r}
+result_pesos[[1]]$metric
+```
+
+## metrics un data frame
+
+```{r}
+config <- c("weighted")
+
+dataset <- cbind(config,result_pesos[[1]]$metric)
+
+config <- c("normal")
+
+cbind(config,resultado[[1]]$metric)
+```
+
+```{r}
+resultados <- rbind(dataset,cbind(config,resultado[[1]]$metric))
+```
+
+## Resultados Junin 
+
+```{r}
+resultados %>% arrange(.metric,config) %>% select(.metric,config,.estimate)
+```
+
+## plots predicho vs real
+
+```{r}
+tmin <- resultado[[1]]$tmin
+tpred <- resultado[[1]]$tmin_pred
+
+```
+
+```{r}
+
+n <- seq(1:length(tmin))
+plot(n, tmin, col="blue", pch=20, cex=.9)
+points(n, tpred, col="red", pch=5, cex=.9)
+
+```
+
+
+```{r}
+tmin <- result_pesos[[1]]$tmin
+tpred <- result_pesos[[1]]$tmin_pred
+
+```
+
+```{r}
+
+n <- seq(1:length(tmin))
+plot(n, tmin, col="blue", pch=20, cex=.9)
+points(n, tpred, col="red", pch=5, cex=.9)
+
+```
+
+Plot weighted model 
+
+```{r}
+tmin <- result_pesos[[1]]$tmin
+tpred <- result_pesos[[1]]$tmin_pred
+predicted <- data_frame(tmin,tpred)
+```
+```{r}
+ggplot(data = predicted, aes(x = tmin))+
+  geom_abline(intercept = 0, slope = 1, color = "navy")+
+  geom_point(aes(y = tpred))+
+  coord_fixed()
+```
+
+
+```{r}
+ggplot() + 
+  geom_line(data = predicted, aes(x = 1:(nrow(predicted)), y = tmin), color = "blue") +
+  geom_line(data = predicted, aes(x = 1:(nrow(predicted)), y = tpred), color = "red") +
+  xlab('Dates') +
+  ylab('Tmin')
+
+```
+
+# Tunuyan
+
+```{r}
+resultado[[2]]$metric
+```
+
+## Metricas resultados
+
+```{r}
+result_pesos[[2]]$metric
+```
+
+```{r}
+config <- c("weighted")
+
+dataset <- cbind(config,result_pesos[[2]]$metric)
+
+config <- c("normal")
+
+cbind(config,resultado[[2]]$metric)
+
+resultados <- rbind(dataset,cbind(config,resultado[[2]]$metric))
+
+resultados %>% arrange(.metric,config) %>% select(.metric,config,.estimate)
+```
+
+# Agua amarga
+
+
+```{r}
+resultado[[3]]$metric
+```
+
+```{r}
+result_pesos[[3]]$metric
+```
+
+```{r}
+config <- c("weighted")
+
+dataset <- cbind(config,result_pesos[[3]]$metric)
+
+config <- c("normal")
+
+cbind(config,resultado[[3]]$metric)
+
+resultados <- rbind(dataset,cbind(config,resultado[[3]]$metric))
+
+resultados %>% arrange(.metric,config) %>% select(.metric,config,.estimate)
+```
+
+
+# Las Paredes
+
+```{r}
+resultado[[4]]$metric
+```
+
+```{r}
+result_pesos[[4]]$metric
+```
+
+```{r}
+config <- c("weighted")
+
+dataset <- cbind(config,result_pesos[[4]]$metric)
+
+config <- c("normal")
+
+cbind(config,resultado[[4]]$metric)
+
+resultados <- rbind(dataset,cbind(config,resultado[[4]]$metric))
+
+resultados %>% arrange(.metric,config) %>% select(.metric,config,.estimate)
+```
+
+
+# La Llave
+
+
+```{r}
+resultado[[5]]$metric
+```
+
+```{r}
+result_pesos[[5]]$metric
+```
+
+
+```{r}
+config <- c("weighted")
+
+dataset <- cbind(config,result_pesos[[5]]$metric)
+
+config <- c("normal")
+
+cbind(config,resultado[[5]]$metric)
+
+resultados <- rbind(dataset,cbind(config,resultado[[5]]$metric))
+
+resultados %>% arrange(.metric,config) %>% select(.metric,config,.estimate)
+```
